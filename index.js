@@ -22,6 +22,29 @@ function apiRequestJson(method, body, token) {
   });
 }
 
+let triggerDeployIdle;
+function delayedTriggerDeploy(uri, after, token, chatId) {
+  clearTimeout(triggerDeployIdle);
+  triggerDeployIdle = setTimeout(() => {
+    request({
+      uri,
+      method: 'post'
+    })
+    .then(() => {
+      return apiRequestJson('sendMessage', {
+        chat_id: chatId,
+        text: '🍭  Deploy triggered!'
+      }, token);
+    })
+    .catch((e) => {
+      return apiRequestJson('sendMessage', {
+        chat_id: chatId,
+        text: '🔥  Unable to trigger the deployd.'
+      }, token);
+    });
+  }, after);
+}
+
 function normaliseUrl(url) {
   var normalisedUrl = url;
   
@@ -98,7 +121,7 @@ function markInStudyLog(message, contentfulMClient) {
   ;
 }
 
-function addToStudyLogRoute(token, chatId, received, contentfulMClient, req, res) {
+function addToStudyLogRoute(token, chatId, received, triggerDeployUrl, triggerDeployAfter, contentfulMClient, req, res) {
   return Promise.resolve()
     .then(() => apiRequestJson('sendMessage', {
       chat_id: chatId,
@@ -118,10 +141,11 @@ function addToStudyLogRoute(token, chatId, received, contentfulMClient, req, res
           text: '✨  Added to your studylog!'
         }, token);
     })
+    .then(() => delayedTriggerDeploy(triggerDeployUrl, triggerDeployAfter, token, chatId))
   ;
 }
 
-function markInStudyLogRoute(token, chatId, received, contentfulMClient, req, res) {
+function markInStudyLogRoute(token, chatId, received, triggerDeployUrl, triggerDeployAfter, contentfulMClient, req, res) {
   return Promise.resolve()
     .then(() => apiRequestJson('sendMessage', {
       chat_id: chatId,
@@ -134,6 +158,7 @@ function markInStudyLogRoute(token, chatId, received, contentfulMClient, req, re
           text: '✨  Marked as studied in your studylog!'
         }, token);
     })
+    .then(() => delayedTriggerDeploy(triggerDeployUrl, triggerDeployAfter, token, chatId))
   ;
 }
 
@@ -148,6 +173,8 @@ app.post('/:token', function (req, res) {
   const authorisedUser = req.webtaskContext.secrets.AUTHORISED_USER;
   const markInStudyLogToken = req.webtaskContext.secrets.MARK_IN_STUDYLOG_TOKEN;
   const addToStudyLogToken = req.webtaskContext.secrets.ADD_TO_STUDYLOG_TOKEN;
+  const triggerDeployUrl = req.webtaskContext.secrets.TRIGGER_DEPLOY_URL;
+  const triggerDeployAfter = req.webtaskContext.secrets.TRIGGER_DEPLOY_AFTER;
   const routeTokens = [markInStudyLogToken, addToStudyLogToken];
   
   
@@ -162,7 +189,7 @@ app.post('/:token', function (req, res) {
   });
   
   const runRoute = function runRoute(route) {
-    route(token, chatId, received, contentfulMClient, req, res)
+    route(token, chatId, received, triggerDeployUrl, triggerDeployAfter, contentfulMClient, req, res)
     .catch((e) => {
       if (e.apiRequestJson) {
         console.log(e.message);
