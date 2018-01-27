@@ -22,7 +22,7 @@ function apiRequestJson(method, body, token) {
   });
 }
 
-let triggerDeployIdle;
+var triggerDeployIdle;
 function delayedTriggerDeploy(uri, after, token, chatId) {
   clearTimeout(triggerDeployIdle);
   triggerDeployIdle = setTimeout(() => {
